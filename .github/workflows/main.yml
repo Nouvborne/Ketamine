@@ -7,19 +7,24 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode Project for Xcode 15
-        run: xcodegen generate --spec project.yml --project-format xcode15
+      - name: Generate Xcode Project
+        run: xcodegen generate --spec project.yml
 
-      - name: Resolve Swift Package Dependencies
+      - name: Resolve Swift Packages
         run: |
           xcodebuild -resolvePackageDependencies \
             -project Ketamine.xcodeproj \
