@@ -7,17 +7,29 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build App
+      - name: Detect and Build Xcode Project
         run: |
+          # 1. Détection automatique du fichier projet ou workspace
+          if [ -d "*.xcworkspace" ]; then
+            FILE_FLAG="-workspace $(ls -d *.xcworkspace | head -n 1)"
+          else
+            FILE_FLAG="-project $(ls -d *.xcodeproj | head -n 1)"
+          fi
+
+          # 2. Détection automatique du premier Scheme disponible
+          SCHEME=$(xcodebuild $FILE_FLAG -list | grep -A 10 "Schemes:" | tail -n +2 | xargs | awk '{print $1}')
+          echo "Scheme détecté : $SCHEME"
+
+          # 3. Compilation sans signature
           xcodebuild clean build \
-            -project Ketamine.xcodeproj \
-            -scheme Ketamine \
+            $FILE_FLAG \
+            -scheme "$SCHEME" \
             -sdk iphoneos \
             -configuration Release \
             CODE_SIGN_IDENTITY="" \
@@ -27,7 +39,7 @@ jobs:
 
       - name: Package IPA
         run: |
-          mkdir Payload
+          mkdir -p Payload
           cp -r build/Release-iphoneos/*.app Payload/
           zip -r Ketamine.ipa Payload
 
