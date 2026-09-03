@@ -1,0 +1,38 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build App
+        run: |
+          xcodebuild clean build \
+            -project Ketamine.xcodeproj \
+            -scheme Ketamine \
+            -sdk iphoneos \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            BUILD_DIR=build
+
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -r build/Release-iphoneos/*.app Payload/
+          zip -r Ketamine.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ketamine-IPA
+          path: Ketamine.ipa
