@@ -62,12 +62,6 @@ final class PasscodeThemeManager {
         BadQuery.applicationContainerPath(appHash: appHash) + "/Library/Caches/TelephonyUI-10"
     }
 
-    /// Cache pour LocalAuthenticationUIService
-static func localAuthCachePath(appHash: String) -> String {
-    BadQuery.applicationContainerPath(appHash: appHash) + "/Library/Caches/TelephonyUI-10"
-}
-
-
     // MARK: - Locale-aware matching
 
     /// Groups a filename by everything after its first hyphen. Locale
