@@ -41,7 +41,9 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            CLANG_ENABLE_MODULES=YES \
+            SWIFT_OBJC_BRIDGING_HEADER="Ketamine/Exploit/Ketamine-Bridging-Header.h"
 
       - name: Paquetage en .ipa
         run: |
