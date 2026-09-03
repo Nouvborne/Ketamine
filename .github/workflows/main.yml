@@ -1,0 +1,56 @@
+name: Build and Release iOS IPA
+
+on:
+  push:
+    branches: [ main, master ] # Se déclenche à chaque push sur la branche principale
+  workflow_dispatch: # Permet aussi un lancement manuel
+
+permissions:
+  contents: write # Nécessaire pour créer le tag et la release
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout du projet
+        uses: actions/checkout@v4
+
+      - name: Installer XcodeGen
+        run: brew install xcodegen
+
+      - name: Générer le projet Xcode
+        run: xcodegen generate
+
+      - name: Configuration de Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build de l'application (.app)
+        run: |
+          xcodebuild clean build \
+            -project Ketamine.xcodeproj \
+            -scheme Ketamine \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Paquetage en .ipa
+        run: |
+          mkdir -p Payload
+          mv build/Build/Products/Release-iphoneos/Ketamine.app Payload/
+          zip -r Ketamine.ipa Payload
+
+      - name: Créer la Release GitHub et le Tag automatiquement
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Ketamine.ipa
+          tag_name: v1.0.${{ github.run_number }} # Crée automatiquement le tag v1.0.1, v1.0.2, etc.
+          name: Release v1.0.${{ github.run_number }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
