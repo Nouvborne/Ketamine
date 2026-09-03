@@ -13,14 +13,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Select Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer
-
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode Project
-        run: xcodegen generate
+      - name: Generate Xcode Project for Xcode 15
+        run: xcodegen generate --spec project.yml --project-format xcode15
+
+      - name: Resolve Swift Package Dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Ketamine.xcodeproj \
+            -scheme Ketamine
 
       - name: Build App
         run: |
