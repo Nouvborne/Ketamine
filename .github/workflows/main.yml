@@ -16,10 +16,10 @@ jobs:
       - name: Checkout du projet
         uses: actions/checkout@v4
 
-      - name: Forcer l'utilisation de Xcode 27
+      - name: Forcer l'utilisation de Xcode 16.2.0
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '27' # Version officielle de Xcode compatible avec iOS 17+
+          xcode-version: '16.2.0' # Version officielle de Xcode compatible avec iOS 17+
 
       - name: Installer XcodeGen
         run: brew install xcodegen
