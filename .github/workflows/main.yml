@@ -10,16 +10,16 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14 # macOS 14 inclut les versions Xcode 15.x
+    runs-on: macos-14 # L'image macOS Sequoia / Sonoma officielle de GitHub
 
     steps:
       - name: Checkout du projet
         uses: actions/checkout@v4
 
-      - name: Forcer l'utilisation de Xcode 15.2
+      - name: Forcer l'utilisation de Xcode 27
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.2'
+          xcode-version: '27' # Version officielle de Xcode compatible avec iOS 17+
 
       - name: Installer XcodeGen
         run: brew install xcodegen
