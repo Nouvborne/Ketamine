@@ -1,0 +1,71 @@
+name: Build and Release iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout du projet
+        uses: actions/checkout@v4
+
+      - name: Forcer l'utilisation de Xcode 15.2
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.2'
+
+      - name: Installer XcodeGen
+        run: brew install xcodegen
+
+      - name: Générer le projet Xcode
+        run: xcodegen generate
+
+      - name: Résoudre les dépendances Swift (SPM)
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Ketamine.xcodeproj \
+            -scheme Ketamine
+
+      - name: Build de l'application (.app)
+        run: |
+          xcodebuild build \
+            -project Ketamine.xcodeproj \
+            -scheme Ketamine \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            OTHER_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"
+
+      - name: Signer en Ad-Hoc et empaqueter l'IPA
+        run: |
+          # 1. Donner les droits d'exécution au binaire
+          chmod +x build/Build/Products/Release-iphoneos/Ketamine.app/Ketamine
+          
+          # 2. Appliquer une pseudo-signature Ad-Hoc
+          codesign --force --deep --sign - build/Build/Products/Release-iphoneos/Ketamine.app
+          
+          # 3. Créer la structure Payload
+          mkdir -p Payload
+          mv build/Build/Products/Release-iphoneos/Ketamine.app Payload/
+          zip -r Ketamine.ipa Payload
+
+      - name: Créer la Release GitHub et le Tag
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Ketamine.ipa
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release v1.0.${{ github.run_number }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
