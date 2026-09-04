@@ -40,6 +40,13 @@
 					<string>AppIconEvilSpecial</string>
 				</array>
 			</dict>
+			<key>AppIconFdm</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIconFdm</string>
+				</array>
+			</dict>
 			<key>AppIconGold</key>
 			<dict>
 				<key>CFBundleIconFiles</key>
