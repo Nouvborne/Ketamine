@@ -75,6 +75,13 @@
 					<string>AppIconWojak</string>
 				</array>
 			</dict>
+			<key>AppIconcatacombFdm</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIconcatacombFdm</string>
+				</array>
+			</dict>
 		</dict>
 		<key>CFBundlePrimaryIcon</key>
 		<dict>
