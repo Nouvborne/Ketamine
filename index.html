@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ketamine — Éditeur MobileGestalt pour iOS</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN (version UMD) -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700;800&display=swap');
+
+    * {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: #030712;
+      overflow-x: hidden;
+      color: #f3f4f6;
+    }
+
+    .gradient-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      background: radial-gradient(circle at 15% 15%, rgba(225, 29, 72, 0.25), transparent 45%),
+                  radial-gradient(circle at 85% 85%, rgba(147, 51, 234, 0.2), transparent 45%),
+                  radial-gradient(circle at 50% 50%, rgba(220, 38, 38, 0.15), transparent 50%),
+                  radial-gradient(circle at 75% 20%, rgba(99, 102, 241, 0.2), transparent 40%);
+      filter: blur(65px);
+      animation: pulseGlow 14s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulseGlow {
+      0% { transform: scale(1) rotate(0deg); }
+      50% { transform: scale(1.08) rotate(2deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(25px) saturate(200%);
+      -webkit-backdrop-filter: blur(25px) saturate(200%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-card:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(244, 63, 94, 0.3);
+      transform: translateY(-3px) scale(1.01);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4),
+                  0 0 20px rgba(225, 29, 72, 0.15);
+    }
+
+    .glass-pill {
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(30px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .shimmer-text {
+      background: linear-gradient(135deg, #ffffff 0%, #f43f5e 50%, #a855f7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .dynamic-island {
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    /* Modal Glass */
+    .modal-backdrop {
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(12px);
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-4 md:p-8 select-none">
+
+  <!-- Arrière-plan flou dynamique -->
+  <div class="gradient-bg"></div>
+
+  <!-- En-tête iOS (Barre de statut / Dynamic Island) -->
+  <header class="w-full max-w-lg mx-auto sticky top-4 z-50">
+    <div id="dynamicIsland" class="dynamic-island glass-pill rounded-full px-6 py-2.5 flex items-center justify-between shadow-2xl cursor-pointer hover:bg-black/70">
+      <div class="flex items-center space-x-2">
+        <div class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></div>
+        <span class="text-xs font-semibold tracking-wide text-gray-300 uppercase">KETAMINE iOS</span>
+      </div>
+      
+      <!-- Horloge temps réel -->
+      <div id="clock" class="text-xs font-medium tracking-wider text-white">00:00</div>
+
+      <div class="flex items-center space-x-3 text-gray-300">
+        <i data-lucide="smartphone" class="w-3.5 h-3.5 text-rose-400"></i>
+        <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+        <i data-lucide="battery-charging" class="w-4 h-4 text-emerald-400"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenu Principal -->
+  <main class="w-full max-w-lg mx-auto my-auto py-8 space-y-6">
+
+    <!-- Carte de présentation de l'application -->
+    <div class="glass-panel rounded-3xl p-6 text-center relative overflow-hidden group">
+      <!-- Halo lumineux décoratif -->
+      <div class="absolute -right-10 -top-10 w-36 h-36 bg-rose-600/20 rounded-full blur-2xl group-hover:bg-rose-600/35 transition-all duration-700"></div>
+      
+      <div class="relative z-10 flex flex-col items-center">
+        <!-- Avatar / Logo de l'application -->
+        <div class="relative mb-5">
+          <div class="absolute -inset-1.5 rounded-full bg-gradient-to-r from-rose-600 via-purple-600 to-red-500 opacity-80 blur"></div>
+          <div class="relative w-28 h-28 rounded-full overflow-hidden border-2 border-white/20 bg-slate-900 flex items-center justify-center shadow-2xl">
+            <img src="FCB35ED3-93AC-4C80-8A75-9BC0563127AC.png" alt="Ketamine iOS Logo" class="w-full h-full object-cover">
+          </div>
+          <div class="absolute bottom-0 right-0 bg-rose-600 text-white rounded-full p-1.5 border-2 border-black" title="MobileGestalt Editor">
+            <i data-lucide="sliders" class="w-4 h-4 stroke-[2.5]"></i>
+          </div>
+        </div>
+
+        <h1 class="text-3xl font-extrabold tracking-tight text-white mb-1.5">Ketamine</h1>
+        <p class="text-xs font-medium text-rose-400 tracking-wide uppercase mb-3">Éditeur MobileGestalt On-Device pour iOS</p>
+        
+        <p class="text-xs text-gray-300/90 leading-relaxed max-w-sm mb-5">
+          Modifiez les clés et valeurs système <span class="text-white font-semibold">MobileGestalt</span> directement depuis votre iPhone, sans aucun ordinateur requis.
+        </p>
+
+        <!-- Badges d'information -->
+        <div class="flex flex-wrap items-center justify-center gap-2">
+          <div class="inline-flex items-center space-x-1.5 bg-white/5 border border-white/10 px-3 py-1 rounded-full text-[11px] text-gray-300">
+            <i data-lucide="cpu" class="w-3 h-3 text-rose-400"></i>
+            <span>Sans Ordinateur</span>
+          </div>
+          <div class="inline-flex items-center space-x-1.5 bg-white/5 border border-white/10 px-3 py-1 rounded-full text-[11px] text-gray-300">
+            <i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i>
+            <span>Recherche & Éducation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section des fonctionnalités principales -->
+    <div class="space-y-3.5">
+      <h2 class="text-xs font-bold uppercase tracking-wider text-gray-400 px-2 flex items-center space-x-2">
+        <i data-lucide="zap" class="w-3.5 h-3.5 text-rose-400"></i>
+        <span>Fonctionnalités Clés</span>
+      </h2>
+
+      <!-- Fonctionnalité 1 -->
+      <div class="glass-card rounded-2xl p-4 flex items-start space-x-4">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-rose-600 to-red-500 flex-shrink-0 flex items-center justify-center text-white shadow-lg shadow-rose-600/30">
+          <i data-lucide="smartphone" class="w-5 h-5"></i>
+        </div>
+        <div class="text-left flex-1">
+          <h3 class="font-semibold text-white text-sm mb-1">Édition On-Device Intégrale</h3>
+          <p class="text-xs text-gray-400 leading-relaxed">
+            Exécutez l'application directement sur votre iPhone pour appliquer des modifications MobileGestalt en toute liberté.
+          </p>
+        </div>
+      </div>
+
+      <!-- Fonctionnalité 2 -->
+      <div class="glass-card rounded-2xl p-4 flex items-start space-x-4">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex-shrink-0 flex items-center justify-center text-white shadow-lg shadow-purple-600/30">
+          <i data-lucide="sliders" class="w-5 h-5"></i>
+        </div>
+        <div class="text-left flex-1">
+          <h3 class="font-semibold text-white text-sm mb-1">Gestion des Clés MobileGestalt</h3>
+          <p class="text-xs text-gray-400 leading-relaxed">
+            Ajustez et personnalisez les paramètres système pris en charge avec sauvegarde automatique des clés modifiées.
+          </p>
+        </div>
+      </div>
+
+      <!-- Fonctionnalité 3 -->
+      <div class="glass-card rounded-2xl p-4 flex items-start space-x-4">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-amber-500 to-rose-500 flex-shrink-0 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+          <i data-lucide="feather" class="w-5 h-5"></i>
+        </div>
+        <div class="text-left flex-1">
+          <h3 class="font-semibold text-white text-sm mb-1">Interface Épurée & Rapide</h3>
+          <p class="text-xs text-gray-400 leading-relaxed">
+            Profitez d'un outil léger, ultra fluide et pensé pour les utilisateurs expérimentés sur iOS.
+          </p>
+        </div>
+      </div>
+
+      <!-- Fonctionnalité 4 -->
+      <div class="glass-card rounded-2xl p-4 flex items-start space-x-4">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-600 flex-shrink-0 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+          <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+        </div>
+        <div class="text-left flex-1">
+          <h3 class="font-semibold text-white text-sm mb-1">Sauvegarde & Restauration</h3>
+          <p class="text-xs text-gray-400 leading-relaxed">
+            Chaque valeur modifiée est sauvegardée au préalable afin de pouvoir revenir en arrière en cas de besoin.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions & Guide d'installation -->
+    <div class="glass-panel rounded-3xl p-5 space-y-3">
+      <button id="openGuideBtn" class="w-full py-3.5 bg-gradient-to-r from-rose-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 active:scale-[0.99] border border-white/20 rounded-2xl text-xs font-bold text-white flex items-center justify-center space-x-2 transition-all shadow-lg shadow-rose-600/25">
+        <i data-lucide="book-open" class="w-4 h-4"></i>
+        <span>Guide d'installation & Prérequis</span>
+      </button>
+
+      <button id="shareAppBtn" class="w-full py-3 bg-white/10 hover:bg-white/15 active:bg-white/20 border border-white/10 rounded-2xl text-xs font-semibold text-white flex items-center justify-center space-x-2 transition-all">
+        <i data-lucide="share-2" class="w-4 h-4 text-gray-300"></i>
+        <span>Partager cette application</span>
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Pied de page -->
+  <footer class="w-full max-w-lg mx-auto text-center py-4">
+    <p class="text-xs text-gray-500">
+      Ketamine iOS • Projet de recherche & éducatif
+    </p>
+  </footer>
+
+  <!-- Modal : Guide d'installation -->
+  <div id="guideModal" class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+    <div class="glass-panel rounded-3xl max-w-md w-full p-6 space-y-5 border border-white/20 relative shadow-2xl transform scale-95 transition-transform duration-300" id="modalContent">
+      <button id="closeGuideBtn" class="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-full bg-white/5 hover:bg-white/10">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-600/20 border border-rose-500/30 flex items-center justify-center text-rose-400">
+          <i data-lucide="help-circle" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-white text-base">Installation & Avertissement</h3>
+          <p class="text-xs text-gray-400">Ketamine MobileGestalt</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs text-gray-300 leading-relaxed max-h-60 overflow-y-auto pr-1">
+        <div class="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-200 flex items-start space-x-2.5">
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5"></i>
+          <span><strong>Avertissement :</strong> La modification des valeurs système MobileGestalt comporte des risques. Effectuez toujours une sauvegarde de vos données avant utilisation.</span>
+        </div>
+
+        <p class="font-semibold text-white">Méthodes d'installation recommandées :</p>
+        <ol class="list-decimal list-inside space-y-1.5 pl-1 text-gray-300">
+          <li>Installez le fichier de l'application via votre outil de signature préféré (TrollStore, AltStore, SideStore, Sideloadly).</li>
+          <li>Accordez les autorisations nécessaires lors du premier lancement sur votre appareil iOS.</li>
+          <li>Utilisez les sauvegardes automatiques intégrées avant toute modification.</li>
+        </ol>
+      </div>
+
+      <button id="closeModalBottomBtn" class="w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold text-xs transition-all">
+        Compris
+      </button>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 glass-pill px-5 py-2.5 rounded-full text-xs font-medium text-white opacity-0 pointer-events-none transition-all duration-300 flex items-center space-x-2 border border-emerald-500/30 z-50">
+    <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+    <span id="toastMsg">Action effectuée</span>
+  </div>
+
+  <script>
+    // Initialisation sécurisée des icônes Lucide
+    function initLucideIcons() {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initLucideIcons);
+    } else {
+      initLucideIcons();
+    }
+
+    // Horloge iOS en temps réel
+    function updateClock() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      document.getElementById('clock').textContent = `${hours}:${minutes}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Gestion du Modal Guide d'installation
+    const guideModal = document.getElementById('guideModal');
+    const modalContent = document.getElementById('modalContent');
+    const openGuideBtn = document.getElementById('openGuideBtn');
+    const closeGuideBtn = document.getElementById('closeGuideBtn');
+    const closeModalBottomBtn = document.getElementById('closeModalBottomBtn');
+
+    function openModal() {
+      guideModal.classList.remove('opacity-0', 'pointer-events-none');
+      guideModal.classList.add('opacity-100');
+      modalContent.classList.remove('scale-95');
+      modalContent.classList.add('scale-100');
+    }
+
+    function closeModal() {
+      guideModal.classList.remove('opacity-100');
+      guideModal.classList.add('opacity-0', 'pointer-events-none');
+      modalContent.classList.remove('scale-100');
+      modalContent.classList.add('scale-95');
+    }
+
+    openGuideBtn.addEventListener('click', openModal);
+    closeGuideBtn.addEventListener('click', closeModal);
+    closeModalBottomBtn.addEventListener('click', closeModal);
+    guideModal.addEventListener('click', (e) => {
+      if (e.target === guideModal) closeModal();
+    });
+
+    // Bouton de partage
+    const shareAppBtn = document.getElementById('shareAppBtn');
+    shareAppBtn.addEventListener('click', () => {
+      const dummy = document.createElement('input');
+      document.body.appendChild(dummy);
+      dummy.value = window.location.href;
+      dummy.select();
+      document.execCommand('copy');
+      document.body.removeChild(dummy);
+
+      showToast("Lien de la page Ketamine copié dans le presse-papier !");
+    });
+
+    // Fonction notification Toast
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.textContent = message;
+      
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    // Effect 3D Tilt au survol
+    document.querySelectorAll('.glass-panel, .glass-card').forEach(card => {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        const rotateX = (y - centerY) / 25;
+        const rotateY = (centerX - x) / 25;
+
+        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-2px)`;
+      });
+
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px)`;
+      });
+    });
+  </script>
+</body>
+</html>
