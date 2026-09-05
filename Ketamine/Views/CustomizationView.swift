@@ -39,6 +39,9 @@ struct CustomizationView: View {
 
 struct PasscodeThemeView: View {
     @AppStorage("phoneHash") private var phoneHash = ""
+    @AppStorage("localAuthHash") private var localAuthHash = ""
+    @AppStorage("inCallHash") private var inCallHash = ""
+
     @State private var showPackageImporter = false
     @State private var isBusy = false
     @State private var showErrorAlert = false
@@ -69,7 +72,7 @@ struct PasscodeThemeView: View {
             Button("Restore", role: .destructive, action: restoreOriginal)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Replaces the current dialer theme with the one saved before your first change.")
+            Text("Replaces the current dialer theme across all app containers with the one saved before your first change.")
         }
         .alert("Something went wrong", isPresented: $showErrorAlert) {
             Button("OK", role: .cancel) {}
@@ -79,7 +82,7 @@ struct PasscodeThemeView: View {
         .alert("Applied", isPresented: $showAppliedAlert) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Replaced \(appliedCount) image\(appliedCount == 1 ? "" : "s"). Restart the Phone app to see the changes.")
+            Text("Replaced \(appliedCount) image\(appliedCount == 1 ? "" : "s") across Phone, LocalAuthenticationUI, and InCallService.")
         }
     }
 
@@ -93,7 +96,7 @@ struct PasscodeThemeView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Phone app's dialer theming")
                         .font(.title2.weight(.semibold))
-                    Text("Swap the Phone app's dialer keypad (0–9) images using a .passthm or .zip package. Every localized copy of a given image is replaced, not just one language.")
+                    Text("Swap the Phone, LocalAuthenticationUI, and InCallService dialer keypad images using a .passthm or .zip package.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -122,7 +125,7 @@ struct PasscodeThemeView: View {
                     }
                     .font(.subheadline.weight(.semibold))
                 }
-                Text("No respring is needed — just relaunch the Phone app.")
+                Text("Relaunch the target app or perform a respring to ensure all cache layers update.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -139,7 +142,7 @@ struct PasscodeThemeView: View {
                 .foregroundStyle(.secondary)
             Text("Theming unavailable")
                 .font(.title2.weight(.semibold))
-            Text("This iOS version cannot open the Phone app's container through bad_query, so its dialer theme cannot be changed here.")
+            Text("This iOS version cannot open the required app containers through bad_query, so dialer theme cannot be changed here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Spacer()
@@ -157,18 +160,46 @@ struct PasscodeThemeView: View {
         }
     }
 
+    /// Fetches/ensures all container hashes exist
+    private func fetchAllHashes() throws -> [String] {
+        var pHash = phoneHash
+        var laHash = localAuthHash
+        var icHash = inCallHash
+
+        if pHash.isEmpty {
+            if let detected = try? BadQuery.findMobilePhoneHash() {
+                pHash = detected
+                DispatchQueue.main.async { phoneHash = detected }
+            }
+        }
+        if laHash.isEmpty {
+            if let detected = try? BadQuery.findLocalAuthenticationHash() {
+                laHash = detected
+                DispatchQueue.main.async { localAuthHash = detected }
+            }
+        }
+        if icHash.isEmpty {
+            if let detected = try? BadQuery.findInCallHash() {
+                icHash = detected
+                DispatchQueue.main.async { inCallHash = detected }
+            }
+        }
+
+        let result = [pHash, laHash, icHash].filter { !$0.isEmpty }
+        if result.isEmpty {
+            throw BadQueryError.missingPath
+        }
+        return result
+    }
+
     private func apply(from url: URL) {
         guard !isBusy else { return }
         isBusy = true
         busyMessage = "Applying theme"
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                var hash = phoneHash
-                if hash.isEmpty {
-                    hash = try BadQuery.findMobilePhoneHash()
-                    DispatchQueue.main.async { phoneHash = hash }
-                }
-                let count = try PasscodeThemeManager.shared.applyTheme(from: url, appHash: hash)
+                let hashes = try fetchAllHashes()
+                let count = try PasscodeThemeManager.shared.applyTheme(from: url, appHashes: hashes)
                 DispatchQueue.main.async {
                     isBusy = false
                     appliedCount = count
@@ -192,12 +223,8 @@ struct PasscodeThemeView: View {
         busyMessage = "Restoring theme"
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                var hash = phoneHash
-                if hash.isEmpty {
-                    hash = try BadQuery.findMobilePhoneHash()
-                    DispatchQueue.main.async { phoneHash = hash }
-                }
-                try PasscodeThemeManager.shared.restoreOriginal(appHash: hash)
+                let hashes = try fetchAllHashes()
+                try PasscodeThemeManager.shared.restoreOriginal(appHashes: hashes)
                 DispatchQueue.main.async {
                     isBusy = false
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -219,12 +246,8 @@ struct PasscodeThemeView: View {
         busyMessage = "Extracting images"
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                var hash = phoneHash
-                if hash.isEmpty {
-                    hash = try BadQuery.findMobilePhoneHash()
-                    DispatchQueue.main.async { phoneHash = hash }
-                }
-                let url = try PasscodeThemeManager.shared.extractImages(appHash: hash)
+                let hashes = try fetchAllHashes()
+                let url = try PasscodeThemeManager.shared.extractImages(appHashes: hashes)
                 DispatchQueue.main.async {
                     isBusy = false
                     extractedZipURL = url
