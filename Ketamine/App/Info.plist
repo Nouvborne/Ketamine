@@ -40,6 +40,13 @@
 					<string>AppIconEvilSpecial</string>
 				</array>
 			</dict>
+			<key>AppIconFdm</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIconFdm</string>
+				</array>
+			</dict>
 			<key>AppIconGold</key>
 			<dict>
 				<key>CFBundleIconFiles</key>
@@ -66,6 +73,13 @@
 				<key>CFBundleIconFiles</key>
 				<array>
 					<string>AppIconWojak</string>
+				</array>
+			</dict>
+			<key>AppIconcatacombFdm</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>AppIconcatacombFdm</string>
 				</array>
 			</dict>
 		</dict>
