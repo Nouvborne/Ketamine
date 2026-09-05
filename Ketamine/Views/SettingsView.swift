@@ -347,7 +347,7 @@ struct SettingsView: View {
         detectingLocalAuthHash = true
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let hash = try BadQuery.findContainerHash(for: "com.apple.LocalAuthenticationUI").trimmingCharacters(in: .whitespacesAndNewlines)
+                let hash = try BadQuery.findContainerHash().trimmingCharacters(in: .whitespacesAndNewlines)
                 DispatchQueue.main.async {
                     localAuthHash = hash
                     detectingLocalAuthHash = false
@@ -369,7 +369,7 @@ struct SettingsView: View {
         detectingInCallHash = true
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                let hash = try BadQuery.findContainerHash(for: "com.apple.InCallService").trimmingCharacters(in: .whitespacesAndNewlines)
+                let hash = try BadQuery.findContainerHash().trimmingCharacters(in: .whitespacesAndNewlines)
                 DispatchQueue.main.async {
                     inCallHash = hash
                     detectingInCallHash = false
