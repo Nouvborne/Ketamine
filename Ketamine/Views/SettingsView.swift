@@ -6,12 +6,16 @@ struct SettingsView: View {
     @EnvironmentObject private var store: GestaltStore
     @AppStorage("pbHash") private var pbHash = ""
     @AppStorage("phoneHash") private var phoneHash = ""
+    @AppStorage("localAuthHash") private var localAuthHash = ""
+    @AppStorage("inCallHash") private var inCallHash = ""
     @AppStorage("accentColor") private var accentColor = AppAccent.blue.rawValue
     @AppStorage("appIcon") private var appIcon = AppIconCatalog.standard.id
     @AppStorage("customColor") private var customColor: Double = 0
     @AppStorage("useCustomColor") private var useCustomColor = false
     @State private var detectingHash = false
     @State private var detectingPhoneHash = false
+    @State private var detectingLocalAuthHash = false
+    @State private var detectingInCallHash = false
     @State private var showHashError = false
     @State private var hashErrorMessage = ""
     @State private var showBackupImporter = false
@@ -27,6 +31,8 @@ struct SettingsView: View {
                 appearance
                 connection
                 phoneConnection
+                localAuthConnection
+                inCallConnection
                 backup
             }
             .padding(Theme.pagePadding)
@@ -35,7 +41,7 @@ struct SettingsView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Preferences")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Could not detect PosterBoard hash", isPresented: $showHashError) {
+        .alert("Could not detect container hash", isPresented: $showHashError) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(hashErrorMessage)
@@ -203,6 +209,60 @@ struct SettingsView: View {
         }
     }
 
+    private var localAuthConnection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("LocalAuthenticationUI container")
+            VStack(alignment: .leading, spacing: 14) {
+                TextField("Container UUID", text: $localAuthHash)
+                    .font(.system(.body, design: .monospaced))
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Button("Detect on device", systemImage: "scope", action: detectLocalAuthHash)
+                        .disabled(detectingLocalAuthHash)
+                    Spacer()
+                    if detectingLocalAuthHash { ProgressView() }
+                    if !localAuthHash.isEmpty {
+                        Button("Clear", role: .destructive) { localAuthHash = "" }
+                    }
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                if !BadQuery.isAvailable {
+                    Text("Detection is unavailable on this iOS version.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var inCallConnection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("InCallService container")
+            VStack(alignment: .leading, spacing: 14) {
+                TextField("Container UUID", text: $inCallHash)
+                    .font(.system(.body, design: .monospaced))
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Button("Detect on device", systemImage: "scope", action: detectInCallHash)
+                        .disabled(detectingInCallHash)
+                    Spacer()
+                    if detectingInCallHash { ProgressView() }
+                    if !inCallHash.isEmpty {
+                        Button("Clear", role: .destructive) { inCallHash = "" }
+                    }
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                if !BadQuery.isAvailable {
+                    Text("Detection is unavailable on this iOS version.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
     private var backup: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader("Backup")
@@ -274,6 +334,50 @@ struct SettingsView: View {
             } catch {
                 DispatchQueue.main.async {
                     detectingPhoneHash = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    hashErrorMessage = error.localizedDescription
+                    showHashError = true
+                }
+            }
+        }
+    }
+
+    private func detectLocalAuthHash() {
+        guard !detectingLocalAuthHash else { return }
+        detectingLocalAuthHash = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let hash = try BadQuery.findContainerHash(for: "com.apple.LocalAuthenticationUI").trimmingCharacters(in: .whitespacesAndNewlines)
+                DispatchQueue.main.async {
+                    localAuthHash = hash
+                    detectingLocalAuthHash = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    detectingLocalAuthHash = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    hashErrorMessage = error.localizedDescription
+                    showHashError = true
+                }
+            }
+        }
+    }
+
+    private func detectInCallHash() {
+        guard !detectingInCallHash else { return }
+        detectingInCallHash = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let hash = try BadQuery.findContainerHash(for: "com.apple.InCallService").trimmingCharacters(in: .whitespacesAndNewlines)
+                DispatchQueue.main.async {
+                    inCallHash = hash
+                    detectingInCallHash = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    detectingInCallHash = false
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
                     hashErrorMessage = error.localizedDescription
                     showHashError = true
