@@ -66,6 +66,11 @@ final class PasscodeThemeManager {
 
     // MARK: - Backup
 
+    /// Single appHash overload for backwards compatibility
+    func ensureBackup(appHash: String) throws {
+        try ensureBackup(appHashes: [appHash])
+    }
+
     /// Ensures a pristine backup exists for all provided container hashes.
     func ensureBackup(appHashes: [String]) throws {
         guard !hasBackup else { return }
@@ -90,6 +95,12 @@ final class PasscodeThemeManager {
     }
 
     // MARK: - Apply
+
+    /// Single appHash overload for backwards compatibility
+    @discardableResult
+    func applyTheme(from packageURL: URL, appHash: String) throws -> Int {
+        try applyTheme(from: packageURL, appHashes: [appHash])
+    }
 
     /// Applies theme across all target container hashes (Phone, LocalAuthenticationUI, InCallService).
     @discardableResult
@@ -160,6 +171,13 @@ final class PasscodeThemeManager {
         return totalReplaced
     }
 
+    // MARK: - Restore
+
+    /// Single appHash overload for backwards compatibility
+    func restoreOriginal(appHash: String) throws {
+        try restoreOriginal(appHashes: [appHash])
+    }
+
     /// Restores original theme assets across all specified container hashes.
     func restoreOriginal(appHashes: [String]) throws {
         guard hasBackup else { throw PasscodeThemeError.noBackup }
@@ -184,6 +202,11 @@ final class PasscodeThemeManager {
     }
 
     // MARK: - Extract
+
+    /// Single appHash overload for backwards compatibility
+    func extractImages(appHash: String) throws -> URL {
+        try extractImages(appHashes: [appHash])
+    }
 
     func extractImages(appHashes: [String]) throws -> URL {
         var sourceDir: URL = backupDirectory
