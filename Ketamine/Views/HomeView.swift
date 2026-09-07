@@ -1,5 +1,6 @@
 import SwiftUI
 
+// MARK: - Neon Fog Theme Definitions & Glass Modifiers
 
 enum TweakCategory: String, CaseIterable, Identifiable {
     case display = "Display"
@@ -10,11 +11,12 @@ enum TweakCategory: String, CaseIterable, Identifiable {
     
     var id: String { rawValue }
     
+    /// Neon highlight color per category
     var neonColor: Color {
         switch self {
         case .display: return Color(red: 0.02, green: 0.71, blue: 0.83) // Neon Cyan
         case .sound: return Color(red: 0.93, green: 0.28, blue: 0.60)   // Neon Pink
-        case .haptics: return Color(red: 0.66, green: 0.33, blue: 0.97) // Neon Purple
+        case .haptics: return Color(red: 0.66, green: 0.33, blue: 0.97) // Neon Violet
         case .system: return Color(red: 0.06, green: 0.73, blue: 0.51)  // Neon Emerald
         case .ai: return Color(red: 0.96, green: 0.62, blue: 0.04)      // Neon Amber
         }
@@ -22,10 +24,9 @@ enum TweakCategory: String, CaseIterable, Identifiable {
 }
 
 struct Theme {
-    static let accent = Color(red: 0.23, green: 0.51, blue: 0.96) // Electric Blue
+    static let accent = Color(red: 0.23, green: 0.51, blue: 0.96)
     static let pagePadding: CGFloat = 16
 }
-
 
 struct FoggyGlassModifier: ViewModifier {
     var cornerRadius: CGFloat = 22
@@ -69,21 +70,9 @@ extension View {
     func liquidGlass(cornerRadius: CGFloat = 22) -> some View {
         self.foggyGlass(cornerRadius: cornerRadius)
     }
-    
-    func glassAction() -> some View {
-        self
-            .padding(.vertical, 14)
-            .padding(.horizontal, 16)
-            .background(Color.red.opacity(0.15))
-            .foregroundStyle(Color.red)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
-            )
-    }
 }
 
+// MARK: - Main View
 
 struct HomeView: View {
     @EnvironmentObject private var store: GestaltStore
@@ -108,9 +97,25 @@ struct HomeView: View {
         store.tweaks.filter(\.isEnabled)
     }
 
+    /// `categoryTweaks` split into rows of two for custom inline expanding rows.
+    private var tweakRows: [[Tweak]] {
+        let tweaks = categoryTweaks
+        return stride(from: 0, to: tweaks.count, by: 2).map { start in
+            Array(tweaks[start..<min(start + 2, tweaks.count)])
+        }
+    }
+
+    private var configuringTweak: Tweak? {
+        guard let configurationID,
+              let tweak = store.tweaks.first(where: { $0.id == configurationID }),
+              tweak.isEnabled else { return nil }
+        return tweak
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
+                // Background Ambient Neon Fog Orbs
                 Color(red: 0.02, green: 0.04, blue: 0.08).ignoresSafeArea()
                 
                 Circle()
@@ -138,7 +143,9 @@ struct HomeView: View {
                                 commandStatus
                                 categoryRail
                                 catalog
-                                if !selectedTweaks.isEmpty { activeConfiguration }
+                                if !selectedTweaks.isEmpty {
+                                    activeConfiguration
+                                }
                             }
                             .padding(.horizontal, Theme.pagePadding)
                             .padding(.bottom, 32)
@@ -149,6 +156,7 @@ struct HomeView: View {
                     }
                 }
             }
+            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Tweaks")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -161,12 +169,14 @@ struct HomeView: View {
                                 .shadow(color: Color.cyan.opacity(0.6), radius: 6)
                         }
                         .disabled(store.enabledCount == 0)
+                        .accessibilityLabel("Apply changes")
                     }
                 }
             }
         }
     }
 
+    // MARK: - Subviews
 
     private var commandStatus: some View {
         HStack(alignment: .center, spacing: 16) {
@@ -189,9 +199,9 @@ struct HomeView: View {
     private var categoryRail: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 9) {
-                categoryPill(title: "All", categoryItem: nil, isSelected: category == nil) { category = nil }
+                categoryPill(title: "All", isSelected: category == nil) { category = nil }
                 ForEach(consoleCategories) { item in
-                    categoryPill(title: item.rawValue, categoryItem: item, isSelected: category == item) { category = item }
+                    categoryPill(title: item.rawValue, isSelected: category == item) { category = item }
                 }
             }
         }
@@ -200,9 +210,10 @@ struct HomeView: View {
         .padding(.horizontal, Theme.pagePadding)
     }
 
-    private func categoryPill(title: String, categoryItem: TweakCategory?, isSelected: Bool, select: @escaping () -> Void) -> some View {
-        let accentColor = categoryItem?.neonColor ?? Color.cyan
-        
+    private func categoryPill(title: String, isSelected: Bool, select: @escaping () -> Void) -> some View {
+        let catEnum = TweakCategory(rawValue: title)
+        let pillColor = catEnum?.neonColor ?? Color.cyan
+
         return Button {
             withAnimation(.snappy) {
                 select()
@@ -211,22 +222,22 @@ struct HomeView: View {
         } label: {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isSelected ? (categoryItem == nil ? Color.cyan : accentColor) : .secondary)
-                .padding(.horizontal, 16)
+                .foregroundStyle(isSelected ? pillColor : .secondary)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(
                     Capsule()
-                        .fill(isSelected ? accentColor.opacity(0.18) : Color.slateGlass)
+                        .fill(isSelected ? pillColor.opacity(0.18) : Color.white.opacity(0.03))
                 )
                 .overlay(
                     Capsule()
-                        .stroke(isSelected ? accentColor.opacity(0.5) : Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(isSelected ? pillColor.opacity(0.5) : Color.white.opacity(0.08), lineWidth: 1)
                 )
-                .shadow(color: isSelected ? accentColor.opacity(0.3) : .clear, radius: 8)
+                .shadow(color: isSelected ? pillColor.opacity(0.3) : .clear, radius: 8)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
-
 
     private var catalog: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -234,13 +245,12 @@ struct HomeView: View {
                 Text(category?.rawValue ?? "All").font(.title3.weight(.semibold))
                 Spacer()
                 Text("\(categoryTweaks.count) available")
-                    .font(.caption.weight(.medium))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(Color.white.opacity(0.05), in: Capsule())
             }
-            
+            // Laid out row by row rather than as one LazyVGrid so the
+            // configuration panel can sit directly under the row holding the
+            // tile that opened it, instead of after the whole catalog.
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(tweakRows.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .top, spacing: 12) {
@@ -251,6 +261,7 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                             .accessibilityHint(tweak.isEnabled ? "Disables this capability" : "Enables this capability")
                         }
+                        // Keeps a lone trailing tile at half width.
                         if row.count == 1 { Color.clear.frame(maxWidth: .infinity) }
                     }
                     if let tweak = configuringTweak,
@@ -263,21 +274,6 @@ struct HomeView: View {
             }
         }
     }
-
-    private var tweakRows: [[Tweak]] {
-        let tweaks = categoryTweaks
-        return stride(from: 0, to: tweaks.count, by: 2).map { start in
-            Array(tweaks[start..<min(start + 2, tweaks.count)])
-        }
-    }
-
-    private var configuringTweak: Tweak? {
-        guard let configurationID,
-              let tweak = store.tweaks.first(where: { $0.id == configurationID }),
-              tweak.isEnabled else { return nil }
-        return tweak
-    }
-
 
     private var activeConfiguration: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -296,7 +292,9 @@ struct HomeView: View {
                     }
                     .font(.subheadline.weight(.medium))
                     .padding(.vertical, 13)
-                    if index < min(selectedTweaks.count, 4) - 1 { Divider().padding(.leading, 36) }
+                    if index < min(selectedTweaks.count, 4) - 1 {
+                        Divider().padding(.leading, 36)
+                    }
                 }
                 if selectedTweaks.count > 4 {
                     Text("+ \(selectedTweaks.count - 4) more changes")
@@ -307,7 +305,7 @@ struct HomeView: View {
                 }
             }
             .padding(.horizontal, 18)
-            .foggyGlass(cornerRadius: 22, borderColor: Theme.accent.opacity(0.3), glowColor: Theme.accent.opacity(0.2), glowRadius: 10)
+            .liquidGlass(cornerRadius: 22)
         }
     }
 
@@ -320,6 +318,7 @@ struct HomeView: View {
     }
 }
 
+// MARK: - Supporting Components
 
 struct TweakCatalogTile: View {
     let tweak: Tweak
@@ -362,7 +361,6 @@ struct TweakCatalogTile: View {
     }
 }
 
-
 struct InlineTweakConfiguration: View {
     @EnvironmentObject private var store: GestaltStore
     let tweak: Tweak
@@ -371,6 +369,7 @@ struct InlineTweakConfiguration: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader("Configure \(tweak.title)")
+            
             switch detail {
             case .picker(let options):
                 Picker("Option", selection: store.pickerBinding(for: tweak.id)) {
@@ -381,6 +380,7 @@ struct InlineTweakConfiguration: View {
                 .pickerStyle(.wheel)
                 .frame(height: 138)
                 .foggyGlass(cornerRadius: 18, borderColor: Color.cyan.opacity(0.35))
+                
             case .textField(let placeholder, let keyboard):
                 TextField(placeholder, text: store.textBinding(for: tweak.id))
                     .keyboardType(keyboard == .numeric ? .numberPad : .default)
@@ -388,106 +388,18 @@ struct InlineTweakConfiguration: View {
                     .padding(14)
                     .foggyGlass(cornerRadius: 16, borderColor: Color.purple.opacity(0.4))
             }
+            
             if let note = tweak.notes {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(Color.amberAccent)
-                    Text(note)
-                        .font(.footnote)
-                        .foregroundStyle(Color.amberAccent)
-                }
-                .padding(10)
-                .background(Color.amberAccent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.amberAccent.opacity(0.3), lineWidth: 1))
+                Label(note, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(Color.amber)
+                    .padding(10)
+                    .background(Color.amber.opacity(0.15), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
         .padding(14)
         .foggyGlass(cornerRadius: 22, borderColor: Color.cyan.opacity(0.3), glowColor: Color.cyan.opacity(0.15), glowRadius: 10)
     }
-}
-
-
-struct ApplyChangesView: View {
-    @EnvironmentObject private var store: GestaltStore
-    @State private var showErrorAlert = false
-    @State private var errorMessage = ""
-    @State private var showRestore = false
-
-    var body: some View {
-        ZStack {
-            Color(red: 0.02, green: 0.04, blue: 0.08).ignoresSafeArea()
-            
-            // Ambient Orbs
-            Circle()
-                .fill(Color.purple.opacity(0.2))
-                .blur(radius: 90)
-                .frame(width: 280, height: 280)
-                .offset(x: -100, y: -200)
-
-            Circle()
-                .fill(Color.cyan.opacity(0.2))
-                .blur(radius: 90)
-                .frame(width: 280, height: 280)
-                .offset(x: 100, y: 200)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text("Command").font(.largeTitle.weight(.bold))
-                    Text("Review staged changes before writing to the MobileGestalt cache.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    
-                    VStack(spacing: 0) {
-                        ForEach(Array(store.tweaks.filter(\.isEnabled).enumerated()), id: \.element.id) { index, tweak in
-                            Label(tweak.title, systemImage: tweak.symbol)
-                                .font(.subheadline.weight(.medium))
-                                .foregroundStyle(Color.cyan)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 14)
-                            if index < store.enabledCount - 1 { Divider() }
-                        }
-                    }
-                    .padding(.horizontal, 18)
-                    .foggyGlass(cornerRadius: 22, borderColor: Color.indigo.opacity(0.3), glowColor: Color.indigo.opacity(0.15), glowRadius: 10)
-
-                    ActionButton(title: "Apply \(store.enabledCount) changes", systemImage: "bolt.fill", isBusy: store.isBusy, action: apply)
-
-                    Button("Restore pristine backup", role: .destructive) { showRestore = true }
-                        .frame(maxWidth: .infinity)
-                        .glassAction()
-                        .disabled(!store.backup.hasBackup)
-                }
-                .padding(Theme.pagePadding)
-            }
-        }
-        .sheet(isPresented: $showRestore) { RestoreSheet() }
-        .alert("Could not apply changes", isPresented: $showErrorAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage)
-        }
-    }
-
-    private func apply() {
-        Task {
-            do {
-                _ = try await store.apply()
-                #if canImport(UIKit)
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                #endif
-                RespringHelper.shared.trigger()
-            } catch {
-                errorMessage = error.localizedDescription
-                showErrorAlert = true
-            }
-        }
-    }
-}
-
-
-extension Color {
-    static let slateGlass = Color(red: 0.08, green: 0.12, blue: 0.20).opacity(0.6)
-    static let amberAccent = Color(red: 0.96, green: 0.62, blue: 0.04)
 }
 
 enum KeyboardKind { case standard, numeric }
@@ -600,33 +512,9 @@ struct SectionHeader: View {
     }
 }
 
-struct ActionButton: View {
-    let title: String
-    let systemImage: String
-    let isBusy: Bool
-    let action: () -> Void
-
+struct ApplyChangesView: View {
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                if isBusy {
-                    ProgressView().tint(.white)
-                } else {
-                    Image(systemName: systemImage)
-                    Text(title)
-                }
-            }
-            .font(.headline)
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                LinearGradient(colors: [Color.blue, Color.indigo, Color.purple], startPoint: .leading, endPoint: .trailing)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: Color.indigo.opacity(0.4), radius: 12)
-        }
-        .disabled(isBusy)
+        Text("Apply Changes View")
     }
 }
 
@@ -642,27 +530,4 @@ struct FeatureUnsupportedView: View {
         }
         .padding()
     }
-}
-
-struct RestoreSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        VStack(spacing: 20) {
-            Capsule().fill(Color.gray.opacity(0.5)).frame(width: 40, height: 5).padding(.top, 8)
-            Text("Restore Backup?").font(.title2.weight(.bold))
-            Text("This will overwrite all active MobileGestalt configurations with the pristine factory backup.")
-                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
-            Button("Restore Pristine Backup", role: .destructive) { dismiss() }
-                .font(.headline).frame(maxWidth: .infinity).padding().background(Color.red, in: RoundedRectangle(cornerRadius: 16))
-                .foregroundStyle(.white)
-            Button("Cancel") { dismiss() }.font(.headline).foregroundStyle(.secondary)
-        }
-        .padding(24)
-        .presentationDetents([.height(280)])
-    }
-}
-
-class RespringHelper {
-    static let shared = RespringHelper()
-    func trigger() { print("Respring triggered") }
 }
