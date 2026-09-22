@@ -1,0 +1,99 @@
+name: Build and Release iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout du projet
+        uses: actions/checkout@v4
+
+      - name: Configurer la version de Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest-stable'
+
+      - name: Installer XcodeGen et ldid
+        run: brew install xcodegen ldid
+
+      - name: Générer le projet Xcode
+        run: xcodegen generate
+
+      - name: Résoudre les dépendances Swift (SPM)
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Ketamine.xcodeproj \
+            -scheme Ketamine
+
+      - name: Build de l'application (.app)
+        run: |
+          xcodebuild build \
+            -project Ketamine.xcodeproj \
+            -scheme Ketamine \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            OTHER_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"
+          
+          if [ ! -d "build/Build/Products/Release-iphoneos/Ketamine.app" ]; then
+            echo "❌ La compilation a échoué. Le fichier .app n'a pas été généré."
+            exit 1
+          fi
+
+      - name: Paquetage et Pseudo-signature (.ipa)
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/Ketamine.app"
+
+          # 1. Donner les permissions d'exécution à l'application
+          chmod -R +x "$APP_PATH"
+
+          # 2. Détecter le fichier d'entitlements s'il existe
+          ENTITLEMENTS=$(find . -name "*.entitlements" -maxdepth 3 | head -n 1)
+
+          # 3. Signer les frameworks et dylibs internes
+          if [ -d "$APP_PATH/Frameworks" ]; then
+            find "$APP_PATH/Frameworks" -type f | while read -r lib; do
+              if file "$lib" | grep -q "Mach-O"; then
+                echo "Signature de la bibliothèque : $lib"
+                ldid -S "$lib"
+              fi
+            done
+          fi
+
+          # 4. Signer le binaire principal
+          if [ -n "$ENTITLEMENTS" ]; then
+            echo "Application des entitlements au binaire principal : $ENTITLEMENTS"
+            ldid -S"$ENTITLEMENTS" "$APP_PATH/Ketamine"
+          else
+            echo "Signature ad-hoc générique du binaire principal"
+            ldid -S "$APP_PATH/Ketamine"
+          fi
+
+          # 5. Emballage au format IPA
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          zip -r --symlinks Ketamine.ipa Payload
+
+      - name: Créer la Release GitHub et le Tag
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Ketamine.ipa
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release v1.0.${{ github.run_number }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

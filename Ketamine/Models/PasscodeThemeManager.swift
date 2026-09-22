@@ -2,11 +2,8 @@
 //  PasscodeThemeManager.swift
 //  Ketamine
 //
-//  Swaps the Phone app's passcode/lock-screen PNGs via the bad_query sandbox
-//  escape. Every localized variant of a given asset is pixel-identical on
-//  device — they're just duplicated under locale-prefixed filenames — so
-//  matching is done by stripping the locale prefix rather than by knowing
-//  the real locale list.
+//  Swaps the Phone, LocalAuthenticationUI, and InCallService app's passcode/lock-screen PNGs 
+//  via the bad_query sandbox escape.
 //
 
 import Foundation
@@ -19,9 +16,6 @@ final class PasscodeThemeManager {
     enum PasscodeThemeError: LocalizedError {
         case notZip
         case noPNGsInPackage
-        /// Carries a sample of the filenames/keys seen on each side, since the
-        /// locale-prefix matching heuristic is unverified against a real
-        /// device — this makes a mismatch self-diagnosing instead of a dead end.
         case noMatchingAssets(liveNames: [String], packageKeys: [String])
         case noBackup
         case noImagesToExtract
@@ -48,8 +42,7 @@ final class PasscodeThemeManager {
         fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
 
-    /// Pristine copy of the live PNGs, taken once and never overwritten —
-    /// same one-time-snapshot philosophy as the MobileGestalt backup.
+    /// Pristine copy of the live PNGs, taken once and never overwritten.
     private var backupDirectory: URL {
         documentsDirectory.appendingPathComponent("Ketamine/PasscodeBackup", isDirectory: true)
     }
@@ -58,16 +51,13 @@ final class PasscodeThemeManager {
         (try? fileManager.contentsOfDirectory(atPath: backupDirectory.path))?.isEmpty == false
     }
 
+    /// Generates the cache path for a specific app container UUID
     static func cachePath(appHash: String) -> String {
         BadQuery.applicationContainerPath(appHash: appHash) + "/Library/Caches/TelephonyUI-10"
     }
 
     // MARK: - Locale-aware matching
 
-    /// Groups a filename by everything after its first hyphen. Locale
-    /// variants of the same asset share this suffix (e.g. "en-lock-mask.png"
-    /// and "de-lock-mask.png" both key to "lock-mask.png"); an asset with no
-    /// hyphen has no locale family and keys to its own full name.
     static func matchKey(for filename: String) -> String {
         let lowercased = filename.lowercased()
         guard let dash = lowercased.firstIndex(of: "-") else { return lowercased }
@@ -76,47 +66,57 @@ final class PasscodeThemeManager {
 
     // MARK: - Backup
 
+    /// Single appHash overload for backwards compatibility
     func ensureBackup(appHash: String) throws {
+        try ensureBackup(appHashes: [appHash])
+    }
+
+    /// Ensures a pristine backup exists for all provided container hashes.
+    func ensureBackup(appHashes: [String]) throws {
         guard !hasBackup else { return }
-        let livePath = Self.cachePath(appHash: appHash)
-        let handle = try BadQuery.consume(path: livePath, create: true)
-        defer { handle.release() }
-
-        let names = ((try? fileManager.contentsOfDirectory(atPath: livePath)) ?? [])
-            .filter { $0.lowercased().hasSuffix(".png") }
-        guard !names.isEmpty else { return }
-
         try fileManager.createDirectory(at: backupDirectory, withIntermediateDirectories: true)
-        for name in names {
-            let source = URL(fileURLWithPath: livePath).appendingPathComponent(name)
-            let destination = backupDirectory.appendingPathComponent(name)
-            if fileManager.fileExists(atPath: destination.path) {
-                try fileManager.removeItem(at: destination)
+
+        for appHash in appHashes where !appHash.isEmpty {
+            let livePath = Self.cachePath(appHash: appHash)
+            guard let handle = try? BadQuery.consume(path: livePath, create: true) else { continue }
+            defer { handle.release() }
+
+            let names = ((try? fileManager.contentsOfDirectory(atPath: livePath)) ?? [])
+                .filter { $0.lowercased().hasSuffix(".png") }
+            
+            for name in names {
+                let source = URL(fileURLWithPath: livePath).appendingPathComponent(name)
+                let destination = backupDirectory.appendingPathComponent(name)
+                if !fileManager.fileExists(atPath: destination.path) {
+                    try? fileManager.copyItem(at: source, to: destination)
+                }
             }
-            try fileManager.copyItem(at: source, to: destination)
         }
     }
 
     // MARK: - Apply
 
-    /// Unzips `packageURL`, matches its PNGs against the live cache by
-    /// locale-stripped name, and overwrites every match in place. Backs up
-    /// the original files first (once, ever, via `ensureBackup`). Returns
-    /// how many files were replaced.
+    /// Single appHash overload for backwards compatibility
     @discardableResult
     func applyTheme(from packageURL: URL, appHash: String) throws -> Int {
+        try applyTheme(from: packageURL, appHashes: [appHash])
+    }
+
+    /// Applies theme across all target container hashes (Phone, LocalAuthenticationUI, InCallService).
+    @discardableResult
+    func applyTheme(from packageURL: URL, appHashes: [String]) throws -> Int {
         let accessing = packageURL.startAccessingSecurityScopedResource()
         defer { if accessing { packageURL.stopAccessingSecurityScopedResource() } }
 
         let data = try Data(contentsOf: packageURL)
-        // ZIP magic: files must start with "PK" — .passthm packages are zips
-        // under a different extension.
         guard data.count >= 4, data[0] == 0x50, data[1] == 0x4B else {
             throw PasscodeThemeError.notZip
         }
 
-        let livePath = Self.cachePath(appHash: appHash)
-        try ensureBackup(appHash: appHash)
+        let validHashes = appHashes.filter { !$0.isEmpty }
+        guard !validHashes.isEmpty else { return 0 }
+
+        try ensureBackup(appHashes: validHashes)
 
         let workDir = documentsDirectory
             .appendingPathComponent("UnzipItems", conformingTo: .directory)
@@ -132,74 +132,93 @@ final class PasscodeThemeManager {
         let packagePNGs = Self.findPNGs(in: extractedDir)
         guard !packagePNGs.isEmpty else { throw PasscodeThemeError.noPNGsInPackage }
 
-        // Every locale variant is identical, so the first PNG found under a
-        // given key is as good as any other.
         var packageByKey: [String: URL] = [:]
         for url in packagePNGs {
             let key = Self.matchKey(for: url.lastPathComponent)
             if packageByKey[key] == nil { packageByKey[key] = url }
         }
 
-        let handle = try BadQuery.consume(path: livePath, create: true)
-        defer { handle.release() }
+        var totalReplaced = 0
+        var allLiveNamesSeen: [String] = []
 
-        let liveNames = ((try? fileManager.contentsOfDirectory(atPath: livePath)) ?? [])
-            .filter { $0.lowercased().hasSuffix(".png") }
+        for appHash in validHashes {
+            let livePath = Self.cachePath(appHash: appHash)
+            guard let handle = try? BadQuery.consume(path: livePath, create: true) else { continue }
 
-        var replaced = 0
-        for name in liveNames {
-            guard let source = packageByKey[Self.matchKey(for: name)] else { continue }
-            let destination = URL(fileURLWithPath: livePath).appendingPathComponent(name)
-            if fileManager.fileExists(atPath: destination.path) {
-                try fileManager.removeItem(at: destination)
+            let liveNames = ((try? fileManager.contentsOfDirectory(atPath: livePath)) ?? [])
+                .filter { $0.lowercased().hasSuffix(".png") }
+            allLiveNamesSeen.append(contentsOf: liveNames)
+
+            for name in liveNames {
+                guard let source = packageByKey[Self.matchKey(for: name)] else { continue }
+                let destination = URL(fileURLWithPath: livePath).appendingPathComponent(name)
+                if fileManager.fileExists(atPath: destination.path) {
+                    try? fileManager.removeItem(at: destination)
+                }
+                if (try? fileManager.copyItem(at: source, to: destination)) != nil {
+                    totalReplaced += 1
+                }
             }
-            try fileManager.copyItem(at: source, to: destination)
-            replaced += 1
+            handle.release()
         }
 
-        guard replaced > 0 else {
+        guard totalReplaced > 0 else {
             throw PasscodeThemeError.noMatchingAssets(
-                liveNames: liveNames.sorted(),
+                liveNames: Array(Set(allLiveNamesSeen)).sorted(),
                 packageKeys: packageByKey.keys.sorted()
             )
         }
-        return replaced
+        return totalReplaced
     }
 
-    /// Restores every PNG in the live cache to what `ensureBackup` saved.
-    func restoreOriginal(appHash: String) throws {
-        guard hasBackup else { throw PasscodeThemeError.noBackup }
-        let livePath = Self.cachePath(appHash: appHash)
-        let handle = try BadQuery.consume(path: livePath, create: true)
-        defer { handle.release() }
+    // MARK: - Restore
 
-        let names = try fileManager.contentsOfDirectory(atPath: backupDirectory.path)
-        for name in names {
-            let source = backupDirectory.appendingPathComponent(name)
-            let destination = URL(fileURLWithPath: livePath).appendingPathComponent(name)
-            if fileManager.fileExists(atPath: destination.path) {
-                try fileManager.removeItem(at: destination)
+    /// Single appHash overload for backwards compatibility
+    func restoreOriginal(appHash: String) throws {
+        try restoreOriginal(appHashes: [appHash])
+    }
+
+    /// Restores original theme assets across all specified container hashes.
+    func restoreOriginal(appHashes: [String]) throws {
+        guard hasBackup else { throw PasscodeThemeError.noBackup }
+        let validHashes = appHashes.filter { !$0.isEmpty }
+
+        let names = (try? fileManager.contentsOfDirectory(atPath: backupDirectory.path)) ?? []
+
+        for appHash in validHashes {
+            let livePath = Self.cachePath(appHash: appHash)
+            guard let handle = try? BadQuery.consume(path: livePath, create: true) else { continue }
+
+            for name in names {
+                let source = backupDirectory.appendingPathComponent(name)
+                let destination = URL(fileURLWithPath: livePath).appendingPathComponent(name)
+                if fileManager.fileExists(atPath: destination.path) {
+                    try? fileManager.removeItem(at: destination)
+                }
+                try? fileManager.copyItem(at: source, to: destination)
             }
-            try fileManager.copyItem(at: source, to: destination)
+            handle.release()
         }
     }
 
     // MARK: - Extract
 
-    /// Zips whichever PNGs are available — the saved backup if one exists,
-    /// otherwise the live cache directly — as a starting point for making a
-    /// custom theme. Purely a read: never creates a backup as a side effect.
+    /// Single appHash overload for backwards compatibility
     func extractImages(appHash: String) throws -> URL {
-        var handle: BadQueryHandle?
-        defer { handle?.release() }
+        try extractImages(appHashes: [appHash])
+    }
 
-        let sourceDir: URL
-        if hasBackup {
-            sourceDir = backupDirectory
-        } else {
-            let livePath = Self.cachePath(appHash: appHash)
-            handle = try BadQuery.consume(path: livePath, create: true)
-            sourceDir = URL(fileURLWithPath: livePath)
+    func extractImages(appHashes: [String]) throws -> URL {
+        var sourceDir: URL = backupDirectory
+
+        if !hasBackup {
+            if let firstHash = appHashes.first(where: { !$0.isEmpty }) {
+                let livePath = Self.cachePath(appHash: firstHash)
+                if let handle = try? BadQuery.consume(path: livePath, create: true) {
+                    sourceDir = URL(fileURLWithPath: livePath)
+                    handle.release()
+                }
+            }
         }
 
         let names = ((try? fileManager.contentsOfDirectory(atPath: sourceDir.path)) ?? [])
